@@ -1,0 +1,36 @@
+{
+    "name": "@fairtest/core",
+    "version": "2.0.0",
+    "description": "Core utilities, constants, and error handling for FairTest Protocol",
+    "main": "index.js",
+    "type": "module",
+    "exports": {
+        ".": "./index.js",
+        "./constants": "./constants.js",
+        "./utils": "./utils.js",
+        "./errors": "./errors.js",
+        "./AutoEvaluator": "./AutoEvaluator.js"
+    },
+    "scripts": {
+        "test": "node --test tests/*.test.js",
+        "lint": "eslint .",
+        "format": "prettier --write \"**/*.js\""
+    },
+    "keywords": [
+        "fairtest",
+        "core",
+        "utilities",
+        "evaluation",
+        "blockchain",
+        "education"
+    ],
+    "author": "FairTest Protocol Team",
+    "license": "MIT",
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "devDependencies": {
+        "eslint": "^8.55.0",
+        "prettier": "^3.1.0"
+    }
+}

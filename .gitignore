@@ -1,0 +1,237 @@
+# FairTest Protocol - Git Ignore File
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+
+# Production builds
+dist/
+build/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Build artifacts
+*.tsbuildinfo
+.eslintcache
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Sui
+.sui/
+sui.log
+
+# Blockchain
+.secrets/
+*.key
+*.pem
+wallets/
+
+# Local development
+.local/
+.temp/
+tmp/
+
+# Documentation builds
+docs/.vitepress/dist
+docs/.vitepress/cache
+
+# Test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Misc
+*.seed
+*.pid
+*.pid.lock
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# vuepress build output
+.vuepress/dist
+
+# vuepress v2.x temp and cache directory
+.temp
+.cache
+
+# Docusaurus cache and generated files
+.docusaurus
+.cache-loader
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# Sui specific
+*.mv
+*.mvir
+build/
+
+# Private keys and secrets
+*.private
+*.secret
+private_keys/
+secrets/
+
+# Deployment artifacts
+deployment/
+deployed_addresses.json
+
+# Local blockchain data
+.blockchain/
+chain_data/
+
+# Contract artifacts
+artifacts/
+cache/
+
+# Hardhat
+hardhat/cache
+hardhat/artifacts
+
+# Foundry
+foundry/out/
+foundry/cache/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*

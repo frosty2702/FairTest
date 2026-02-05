@@ -1,0 +1,21 @@
+{
+    "name": "@fairtest/ens-integration",
+    "version": "1.0.0",
+    "description": "ENS integration for FairTest Protocol exam discovery",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "test": "node --test tests/*.test.js"
+    },
+    "dependencies": {
+        "ethers": "^6.9.0",
+        "dotenv": "^16.3.1"
+    },
+    "keywords": [
+        "ens",
+        "ethereum-name-service",
+        "decentralized-naming"
+    ],
+    "author": "FairTest Team",
+    "license": "MIT"
+}

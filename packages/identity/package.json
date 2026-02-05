@@ -1,0 +1,20 @@
+{
+    "name": "@fairtest/identity",
+    "version": "1.0.0",
+    "description": "Anonymous identity management for FairTest Protocol",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "test": "node --test tests/*.test.js"
+    },
+    "dependencies": {
+        "crypto": "^1.0.1"
+    },
+    "keywords": [
+        "privacy",
+        "anonymous-identity",
+        "cryptographic-uid"
+    ],
+    "author": "FairTest Team",
+    "license": "MIT"
+}

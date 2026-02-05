@@ -1,0 +1,39 @@
+{
+  "name": "fairtest-protocol",
+  "version": "1.0.0",
+  "description": "Decentralized exam platform with instant payments, anonymous evaluation, and immutable results",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "packages/*",
+    "sui-contracts"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "test:yellow": "npm run test --workspace=packages/yellow-integration",
+    "test:ens": "npm run test --workspace=packages/ens-integration",
+    "test:identity": "npm run test --workspace=packages/identity",
+    "test:e2e": "npm run test --workspace=tests",
+    "deploy:sui": "node scripts/deploy-sui-contracts.js",
+    "deploy:ens": "node scripts/deploy-ens-controller.js",
+    "setup:yellow": "node scripts/setup-yellow-integration.js"
+  },
+  "keywords": [
+    "web3",
+    "blockchain",
+    "yellow-network",
+    "sui",
+    "ens",
+    "decentralized-exam",
+    "hackathon"
+  ],
+  "author": "FairTest Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "prettier": "^3.1.0",
+    "eslint": "^8.55.0"
+  }
+}

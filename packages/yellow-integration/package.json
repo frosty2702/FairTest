@@ -1,0 +1,21 @@
+{
+    "name": "@fairtest/yellow-integration",
+    "version": "1.0.0",
+    "description": "Yellow Network SDK integration for FairTest Protocol",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "test": "node --test tests/*.test.js"
+    },
+    "dependencies": {
+        "ethers": "^6.9.0",
+        "dotenv": "^16.3.1"
+    },
+    "keywords": [
+        "yellow-network",
+        "state-channels",
+        "off-chain-payments"
+    ],
+    "author": "FairTest Team",
+    "license": "MIT"
+}
