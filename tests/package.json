@@ -1,15 +1,16 @@
 {
-    "name": "@fairtest/tests",
-    "version": "1.0.0",
-    "description": "End-to-end tests for FairTest Protocol",
-    "type": "module",
-    "scripts": {
-        "test": "node --test e2e-workflow.test.js",
-        "test:privacy": "node --test privacy-audit.test.js"
-    },
-    "dependencies": {
-        "@fairtest/yellow-integration": "file:../packages/yellow-integration",
-        "@fairtest/ens-integration": "file:../packages/ens-integration",
-        "@fairtest/identity": "file:../packages/identity"
-    }
+  "name": "@fairtest/tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for FairTest Protocol",
+  "type": "module",
+  "scripts": {
+    "test": "node --test e2e-workflow.test.js",
+    "test:privacy": "node --test privacy-audit.test.js"
+  },
+  "dependencies": {
+    "@fairtest/yellow-integration": "file:../packages/yellow-integration",
+    "@fairtest/ens-integration": "file:../packages/ens-integration",
+    "@fairtest/identity": "file:../packages/identity",
+    "ethers": "^6.9.0"
+  }
 }
