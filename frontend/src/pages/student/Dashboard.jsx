@@ -1,9 +1,13 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useWallet } from '@suiet/wallet-kit';
 import fairTestService from '../../services/FairTestService';
 import './Dashboard.css';
 
 const StudentDashboard = () => {
+  const { address } = useWallet();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [upcomingExams, setUpcomingExams] = useState([]);
@@ -11,16 +15,19 @@ const StudentDashboard = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (address) {
+      loadDashboardData();
+    } else {
+      setLoading(false);
+    }
+  }, [address]);
 
   const loadDashboardData = async () => {
+    if (!address) return;
     try {
       setLoading(true);
-      
-      // Connect wallet
-      const mockWallet = '0x' + Math.random().toString(16).substring(2, 42);
-      await fairTestService.connectWallet(mockWallet);
+      setError(null);
+      await fairTestService.connectWallet(address);
       
       // Get available exams from ENS + Sui
       const exams = await fairTestService.browseExams();
@@ -74,6 +81,18 @@ const StudentDashboard = () => {
     }
   };
 
+  if (!address) {
+    return (
+      <div className="student-dashboard">
+        <div className="empty-state" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+          <h2>🔗 Connect Your Wallet</h2>
+          <p>Connect your Sui wallet (e.g. Suiet) to browse exams, take tests, and view results.</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>Use the Connect Wallet button in the top bar.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="student-dashboard">
@@ -124,7 +143,7 @@ const StudentDashboard = () => {
         <div className="dashboard-section">
           <div className="section-header">
             <h2 className="section-title">Upcoming Exams</h2>
-            <Link to="/student/browse" className="section-link">
+            <Link href="/student/browse" className="section-link">
               Browse More →
             </Link>
           </div>
@@ -155,7 +174,7 @@ const StudentDashboard = () => {
                 </div>
 
                 <Link
-                  to={`/student/take/${exam.id}`}
+                  href={`/student/exam/${exam.id}/instructions`}
                   className="btn btn-primary btn-block"
                 >
                   Start Exam
@@ -168,7 +187,7 @@ const StudentDashboard = () => {
         <div className="dashboard-section">
           <div className="section-header">
             <h2 className="section-title">Recent Results</h2>
-            <Link to="/student/results" className="section-link">
+            <Link href="/student/results" className="section-link">
               View All →
             </Link>
           </div>
@@ -205,7 +224,7 @@ const StudentDashboard = () => {
 
                 <div className="result-footer">
                   <span className="result-date">📅 {result.date}</span>
-                  <Link to={`/student/results/${result.id}`} className="result-link">
+                  <Link href={`/student/results`} className="result-link">
                     View Details →
                   </Link>
                 </div>
@@ -216,10 +235,10 @@ const StudentDashboard = () => {
       </div>
 
       <div className="quick-actions">
-        <Link to="/student/browse" className="btn btn-primary">
+        <Link href="/student/browse" className="btn btn-primary">
           🔍 Browse Exams
         </Link>
-        <Link to="/student/results" className="btn btn-secondary">
+        <Link href="/student/results" className="btn btn-secondary">
           📊 View All Results
         </Link>
       </div>

@@ -77,7 +77,7 @@ function App() {
                 }
             />
             <Route
-                path="/student/take/:examId"
+                path="/student/exam/:examId/take"
                 element={
                     <MainLayout title="Take Exam" role="student" onRoleChange={setRole}>
                         <TakeExam />

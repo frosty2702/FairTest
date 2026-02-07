@@ -1,9 +1,14 @@
+'use client';
+
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useWallet } from '@suiet/wallet-kit';
 import './Sidebar.css';
 
 const Sidebar = ({ role }) => {
-  const location = useLocation();
+  const pathname = usePathname();
+  const { address } = useWallet();
   
   const menuItems = {
     creator: [
@@ -40,8 +45,8 @@ const Sidebar = ({ role }) => {
         {items.map((item) => (
           <Link
             key={item.path}
-            to={item.path}
-            className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+            href={item.path}
+            className={`nav-item ${pathname === item.path ? 'active' : ''}`}
           >
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
@@ -56,7 +61,7 @@ const Sidebar = ({ role }) => {
           </div>
           <div className="user-info">
             <div className="user-name">{role.charAt(0).toUpperCase() + role.slice(1)}</div>
-            <div className="user-wallet">0x1234...5678</div>
+            <div className="user-wallet">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'}</div>
           </div>
         </div>
       </div>

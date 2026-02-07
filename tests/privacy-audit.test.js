@@ -16,24 +16,24 @@ describe('Privacy Guarantees', () => {
     const walletAddress = '0x1234567890abcdef1234567890abcdef12345678';
     const examId = 'exam-test-123';
     
-    it('UID_HASH must not contain wallet address', () => {
+    it('FINAL_HASH must not contain wallet address', async () => {
         const idManager = new AnonymousIDManager();
-        const uidData = idManager.generateUID(walletAddress, examId);
+        const uidData = await idManager.generateExamIdentity(walletAddress, examId);
         
-        const uidHashLower = uidData.uidHash.toLowerCase();
+        const finalHashLower = uidData.finalHash.toLowerCase();
         const walletLower = walletAddress.toLowerCase();
         
-        assert.ok(!uidHashLower.includes(walletLower), 'UID_HASH contains wallet address!');
-        assert.ok(!uidHashLower.includes(walletLower.substring(2)), 'UID_HASH contains wallet address (without 0x)!');
+        assert.ok(!finalHashLower.includes(walletLower), 'FINAL_HASH contains wallet address!');
+        assert.ok(!finalHashLower.includes(walletLower.substring(2)), 'FINAL_HASH contains wallet address (without 0x)!');
         
-        console.log('✓ UID_HASH does not contain wallet address');
+        console.log('✓ FINAL_HASH does not contain wallet address');
     });
     
-    it('Submission payload must not contain wallet address', () => {
+    it('Submission payload must not contain wallet address', async () => {
         const idManager = new AnonymousIDManager();
-        const uidData = idManager.generateUID(walletAddress, examId);
+        const uidData = await idManager.generateExamIdentity(walletAddress, examId);
         const submission = idManager.createSubmissionPayload(
-            uidData.uidHash,
+            uidData,
             examId,
             { q1: 'A', q2: 'B' }
         );
@@ -47,13 +47,13 @@ describe('Privacy Guarantees', () => {
         console.log('✓ Submission payload does not contain wallet address');
     });
     
-    it('Privacy audit function must detect wallet leaks', () => {
+    it('Privacy audit function must detect wallet leaks', async () => {
         const idManager = new AnonymousIDManager();
-        const uidData = idManager.generateUID(walletAddress, examId);
+        const uidData = await idManager.generateExamIdentity(walletAddress, examId);
         
         // Good submission (no wallet)
         const goodSubmission = {
-            uidHash: uidData.uidHash,
+            finalHash: uidData.finalHash,
             examId,
             answerHash: 'abc123'
         };
@@ -63,7 +63,7 @@ describe('Privacy Guarantees', () => {
         
         // Bad submission (contains wallet)
         const badSubmission = {
-            uidHash: uidData.uidHash,
+            finalHash: uidData.finalHash,
             examId,
             answerHash: 'abc123',
             leakedWallet: walletAddress // This should fail audit
@@ -73,27 +73,27 @@ describe('Privacy Guarantees', () => {
         console.log('✓ Privacy audit detects wallet address leaks');
     });
     
-    it('Multiple students must have unique UID_HASHes', () => {
+    it('Multiple students must have unique FINAL_HASHes', async () => {
         const idManager = new AnonymousIDManager();
         
         const student1 = '0xaaaaaaaaaaaaaaaa';
         const student2 = '0xbbbbbbbbbbbbbbbb';
         
-        const uid1 = idManager.generateUID(student1, examId);
-        const uid2 = idManager.generateUID(student2, examId);
+        const uid1 = await idManager.generateExamIdentity(student1, examId);
+        const uid2 = await idManager.generateExamIdentity(student2, examId);
         
-        assert.notEqual(uid1.uidHash, uid2.uidHash, 'Different students must have different UID_HASHes');
-        console.log('✓ Different students have unique UID_HASHes');
+        assert.notEqual(uid1.finalHash, uid2.finalHash, 'Different students must have different FINAL_HASHes');
+        console.log('✓ Different students have unique FINAL_HASHes');
     });
     
-    it('Same student, different exams must have unique UID_HASHes', () => {
+    it('Same student, different exams must have unique FINAL_HASHes', async () => {
         const idManager = new AnonymousIDManager();
         
-        const uid1 = idManager.generateUID(walletAddress, 'exam-1');
-        const uid2 = idManager.generateUID(walletAddress, 'exam-2');
+        const uid1 = await idManager.generateExamIdentity(walletAddress, 'exam-1');
+        const uid2 = await idManager.generateExamIdentity(walletAddress, 'exam-2');
         
-        assert.notEqual(uid1.uidHash, uid2.uidHash, 'Same student in different exams must have different UID_HASHes');
-        console.log('✓ Same student has unique UID_HASH per exam');
+        assert.notEqual(uid1.finalHash, uid2.finalHash, 'Same student in different exams must have different FINAL_HASHes');
+        console.log('✓ Same student has unique FINAL_HASH per exam');
     });
 });
 

@@ -84,3 +84,16 @@
 .wallet-btn {
   padding: 10px 20px;
 }
+
+.wallet-connect-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+/* Suiet ConnectButton overrides to match our theme */
+.wallet-connect-wrapper button {
+  padding: 10px 20px !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}

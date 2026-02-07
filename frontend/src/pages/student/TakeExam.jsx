@@ -1,141 +1,97 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import AnonymousIDManager from 'identity';
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import fairTestService from '../../services/FairTestService';
 import ExamInterface from '../../components/ExamInterface';
 
-function TakeExam() {
-    const { examId } = useParams();
-    const navigate = useNavigate();
-    const [step, setStep] = useState(1); // 1: instructions, 2: exam, 3: submitting
+function TakeExam({ examId }) {
+    const router = useRouter();
+    const [step, setStep] = useState(1); // 1: exam, 2: submitting
     const [uidData, setUidData] = useState(null);
     const [exam, setExam] = useState(null);
     const [questions, setQuestions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const examStartTimeRef = useRef(null);
 
     useEffect(() => {
-        // Load exam data
-        // In production, fetch from Sui blockchain
-        setExam({
-            id: examId,
-            name: 'NEET Practice 2024',
-            duration: 60, // minutes
-            totalMarks: 100,
-            instructions: 'Read all questions carefully. You can navigate between questions. Timer will auto-submit when time expires.'
-        });
+        const uid = fairTestService.getExamIdentity(examId);
+        if (!uid) {
+            router.replace(`/student/exam/${examId}/instructions`);
+            return;
+        }
+        setUidData(uid);
+    }, [examId, router]);
 
-        // Load questions
-        // In production, fetch from off-chain storage using hash from Sui
-        setQuestions([
-            {
-                id: 'q1',
-                type: 'mcq',
-                text: 'What is the consensus mechanism used by Sui?',
-                options: ['Proof of Work', 'Proof of Stake / Narwhal & Bullshark', 'Delegated Proof of Stake', 'Proof of History'],
-                correctAnswer: 1,
-                marks: 4,
-                negativeMarks: 1
-            },
-            {
-                id: 'q2',
-                type: 'multiple_correct',
-                text: 'Which of the following are Layer 1 blockchains?',
-                options: ['Ethereum', 'Polygon', 'Sui', 'Arbitrum'],
-                correctAnswers: [0, 2],
-                marks: 4,
-                negativeMarks: 0
-            },
-            {
-                id: 'q3',
-                type: 'true_false',
-                text: 'Yellow Network enables off-chain payment sessions.',
-                correctAnswer: true,
-                marks: 2,
-                negativeMarks: 0
-            }
-        ]);
-    }, [examId]);
+    useEffect(() => {
+        if (uidData && exam && questions.length > 0 && !examStartTimeRef.current) {
+            examStartTimeRef.current = Date.now();
+        }
+    }, [uidData, exam, questions]);
 
-    const startExam = () => {
-        const idManager = new AnonymousIDManager();
-        const data = idManager.generateUID('0xabc...', examId);
-        idManager.storeUIDLocally(data);
-        setUidData(data);
-        setStep(2);
-    };
+    useEffect(() => {
+        if (!uidData) return;
+        let cancelled = false;
+        fairTestService.getExam(examId)
+            .then((data) => {
+                if (cancelled) return;
+                setExam({
+                    id: data.examId,
+                    name: data.title,
+                    duration: data.duration,
+                    totalMarks: data.totalMarks,
+                    instructions: data.instructions || 'Read all questions carefully. Timer will auto-submit when time expires.'
+                });
+                setQuestions(data.questions || []);
+            })
+            .catch((err) => { if (!cancelled) setError(err.message); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [examId, uidData]);
 
     const handleSubmit = async (answers) => {
-        setStep(3);
-        
-        // Hash answers
-        const idManager = new AnonymousIDManager();
-        const submissionPayload = idManager.createSubmissionPayload(
-            uidData.uidHash,
-            examId,
-            answers
-        );
-
-        // Privacy audit
-        const audit = idManager.auditPrivacy(submissionPayload, '0xabc...');
-        console.log('[Privacy Audit]', audit.passed ? 'PASSED' : 'FAILED');
-
-        // Submit to Sui
-        console.log('[Sui] Creating SubmissionObject with UID_HASH:', uidData.uidHash.substring(0, 16) + '...');
-        
-        // Simulation of Sui transaction
-        await new Promise(r => setTimeout(r, 2000));
-        
-        navigate('/student/results');
+        setStep(2);
+        setError(null);
+        const timeTaken = examStartTimeRef.current
+            ? Math.round((Date.now() - examStartTimeRef.current) / 1000)
+            : 0;
+        try {
+            await fairTestService.submitExam(examId, answers, timeTaken);
+            router.push('/student/results');
+        } catch (err) {
+            console.error(err);
+            setError(err.message || 'Failed to submit exam.');
+            setStep(1);
+        }
     };
 
-    if (!exam || questions.length === 0) {
+    if (loading) {
         return <div style={{ textAlign: 'center', padding: '4rem' }}>Loading exam...</div>;
+    }
+    if (error && (!exam || !questions.length)) {
+        return (
+            <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <p style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>
+                <button onClick={() => router.push('/student/browse')} className="btn-secondary">Back to Browse</button>
+            </div>
+        );
+    }
+    if (!exam || questions.length === 0) {
+        return (
+            <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <p style={{ color: 'var(--text-muted)' }}>Exam not found.</p>
+                <button onClick={() => router.push('/student/browse')} className="btn-secondary">Back to Browse</button>
+            </div>
+        );
     }
 
     return (
         <div className="take-exam">
-            {step === 1 && (
-                <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-                    <div className="glass-card" style={{ padding: '3rem' }}>
-                        <h1 style={{ marginBottom: '1.5rem' }}>{exam.name}</h1>
-                        
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '2rem', padding: '1.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem' }}>
-                            <div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Duration</div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: '600' }}>{exam.duration} minutes</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Questions</div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: '600' }}>{questions.length}</div>
-                            </div>
-                            <div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Total Marks</div>
-                                <div style={{ fontSize: '1.25rem', fontWeight: '600' }}>{exam.totalMarks}</div>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: '2rem' }}>
-                            <h3 style={{ marginBottom: '1rem' }}>Instructions</h3>
-                            <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
-                                {exam.instructions}
-                            </p>
-                        </div>
-
-                        <div style={{ padding: '1.5rem', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.3)', borderRadius: '0.5rem', marginBottom: '2rem' }}>
-                            <h4 style={{ marginBottom: '0.5rem' }}>Privacy Notice</h4>
-                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                                Clicking start will generate your <strong>Anonymous UID</strong>.
-                                This ID is stored locally and will be used to look up your results securely.
-                                Your wallet address will never be linked to your exam submission.
-                            </p>
-                        </div>
-
-                        <button onClick={startExam} className="btn-primary" style={{ width: '100%', padding: '1rem', fontSize: '1.125rem' }}>
-                            Generate UID & Start Exam
-                        </button>
-                    </div>
-                </div>
+            {error && step !== 2 && (
+                <div style={{ marginBottom: '1rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem', color: 'var(--error)' }}>{error}</div>
             )}
-
-            {step === 2 && uidData && (
+            {step === 1 && uidData && (
                 <ExamInterface
                     exam={exam}
                     questions={questions}
@@ -144,7 +100,7 @@ function TakeExam() {
                 />
             )}
 
-            {step === 3 && (
+            {step === 2 && (
                 <div style={{ maxWidth: '700px', margin: '0 auto' }}>
                     <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
                         <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>✓</div>

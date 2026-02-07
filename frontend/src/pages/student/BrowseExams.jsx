@@ -1,61 +1,82 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ENSManager from 'ens-integration';
-import PaymentFlow from 'yellow-integration';
+import { useRouter } from 'next/navigation';
+import fairTestService from '../../services/FairTestService';
 
 function BrowseExams() {
-    const navigate = useNavigate();
+    const router = useRouter();
     const [exams, setExams] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [status, setStatus] = useState('');
+    const [error, setError] = useState(null);
 
     useEffect(() => {
-        const ens = new ENSManager();
-        ens.getExamList().then(setExams);
+        let cancelled = false;
+        fairTestService.browseExams()
+            .then((list) => { if (!cancelled) setExams(list); })
+            .catch((err) => { if (!cancelled) setError(err.message); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
     }, []);
 
     const handleRegister = async (exam) => {
+        if (!fairTestService.currentWallet) {
+            setError('Please connect your wallet first.');
+            return;
+        }
         setIsProcessing(true);
-        setStatus(`Registering for ${exam.examName} via Yellow...`);
+        setStatus(`Registering for ${exam.title}...`);
+        setError(null);
 
         try {
-            const payment = new PaymentFlow();
-            await payment.processRegistrationPayment({
-                studentWallet: '0xabc...',
-                examId: exam.suiObjectID,
-                examFee: exam.examFee,
-                creatorWallet: exam.creatorWallet
-            });
-
-            setStatus('Registration Successful!');
-            setTimeout(() => {
-                navigate(`/student/take/${exam.suiObjectID}`);
-            }, 1500);
+            await fairTestService.registerForExam(exam.examId);
+            setStatus('Registration successful!');
+            router.push(`/student/exam/${exam.examId}/instructions`);
         } catch (err) {
             console.error(err);
+            setError(err.message || 'Registration failed.');
             setIsProcessing(false);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="browse-exams">
+                <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Browse Exams</h1>
+                <p style={{ color: 'var(--text-muted)' }}>Loading exams...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="browse-exams">
             <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '2rem' }}>Browse Exams</h1>
 
+            {error && (
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '0.5rem', color: 'var(--error)' }}>
+                    {error}
+                </div>
+            )}
+
             {isProcessing ? (
                 <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
                     <h2 style={{ marginBottom: '1rem' }}>{status}</h2>
-                    <p style={{ color: 'var(--text-muted)' }}>Interacting with Yellow Network for off-chain registration.</p>
+                    <p style={{ color: 'var(--text-muted)' }}>Completing registration via FairTest.</p>
                 </div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
                     {exams.map(exam => (
-                        <div key={exam.ensDomain} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600', marginBottom: '0.5rem' }}>{exam.ensDomain}</div>
-                            <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>{exam.examName}</h3>
+                        <div key={exam.examId} className="glass-card" style={{ display: 'flex', flexDirection: 'column' }}>
+                            {exam.ensDomain && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--primary)', fontWeight: '600', marginBottom: '0.5rem' }}>{exam.ensDomain}</div>
+                            )}
+                            <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>{exam.title}</h3>
                             <div style={{ marginTop: 'auto' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
                                     <span style={{ color: 'var(--text-muted)' }}>Fee:</span>
-                                    <span style={{ fontWeight: '600' }}>{exam.examFee} SUI</span>
+                                    <span style={{ fontWeight: '600' }}>{exam.fee} SUI</span>
                                 </div>
                                 <button
                                     onClick={() => handleRegister(exam)}
