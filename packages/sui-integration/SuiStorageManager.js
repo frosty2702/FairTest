@@ -4,12 +4,12 @@
  * No in-memory Maps; real object IDs and transaction digests from chain.
  */
 
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { Transaction } from '@mysten/sui/transactions';
-import { bcs } from '@mysten/sui/bcs';
-import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
-import { Secp256k1Keypair } from '@mysten/sui/keypairs/secp256k1';
-import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
+import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { bcs } from '@mysten/sui.js/bcs';
+import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { Secp256k1Keypair } from '@mysten/sui.js/keypairs/secp256k1';
+import { decodeSuiPrivateKey } from '@mysten/sui.js/cryptography';
 
 const SUI_CLOCK_OBJECT_ID = '0x6';
 
@@ -85,8 +85,8 @@ export default class SuiStorageManager {
 
     async _executeTx(transaction) {
         if (!this.signer) throw new Error('SuiStorageManager: SUI_PRIVATE_KEY required for writes');
-        const result = await this.client.signAndExecuteTransaction({
-            transaction,
+        const result = await this.client.signAndExecuteTransactionBlock({
+            transactionBlock: transaction,
             signer: this.signer,
             options: { showObjectChanges: true }
         });
@@ -104,7 +104,7 @@ export default class SuiStorageManager {
         const ensName = examData.ensDomain ?? '';
         const examFee = BigInt(Math.floor(Number(examData.fee ?? 0) * 1e9));
 
-        const tx = new Transaction();
+        const tx = new TransactionBlock();
         tx.moveCall({
             target: `${this.packageId}::exam::create_exam`,
             arguments: [
@@ -223,7 +223,7 @@ export default class SuiStorageManager {
             ? hexToBytes(submissionData.answerHash.startsWith('0x') ? submissionData.answerHash.slice(2) : submissionData.answerHash)
             : this._bytesArg(submissionData.answerHash);
 
-        const tx = new Transaction();
+        const tx = new TransactionBlock();
         tx.moveCall({
             target: `${this.packageId}::submission::create_submission`,
             arguments: [
@@ -241,6 +241,19 @@ export default class SuiStorageManager {
 
         const submissionId = objectId;
         console.log('[Sui] Submission stored:', submissionId);
+        
+        // Store answers in local storage for evaluator to access
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const storageKey = `fairtest_submission_${submissionId}`;
+            localStorage.setItem(storageKey, JSON.stringify({
+                submissionId,
+                examId: submissionData.examId,
+                answers: submissionData.answers,
+                timeTaken: submissionData.timeTaken,
+                timestamp: Date.now()
+            }));
+        }
+        
         if (this.ensManager) {
             try {
                 await this.ensManager.appendSubmissionId(submissionData.examId, submissionId);
@@ -282,14 +295,29 @@ export default class SuiStorageManager {
         if (obj.error || !obj.data) throw new Error(`Submission ${submissionId} not found on blockchain`);
         const parsed = this._parseSubmissionObject(obj.data);
         if (!parsed) throw new Error(`Invalid submission object: ${submissionId}`);
+        
+        // Retrieve answers from local storage
+        let answers = null;
+        let timeTaken = 0;
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const storageKey = `fairtest_submission_${submissionId}`;
+            const stored = localStorage.getItem(storageKey);
+            if (stored) {
+                const data = JSON.parse(stored);
+                answers = data.answers;
+                timeTaken = data.timeTaken || 0;
+            }
+        }
+        
         return {
             submissionId,
             objectId: submissionId,
             examId: parsed.examId,
             finalHash: parsed.finalHash,
             answerHash: parsed.answerHash,
+            answers, // Include actual answers for evaluator
             submittedAt: parsed.timestamp,
-            timeTaken: 0,
+            timeTaken,
             status: 'pending_evaluation'
         };
     }
@@ -333,7 +361,7 @@ export default class SuiStorageManager {
         const maxScore = BigInt(Math.floor(Number(resultData.maxScore ?? 100)));
         const rank = BigInt(0);
 
-        const tx = new Transaction();
+        const tx = new TransactionBlock();
         tx.moveCall({
             target: `${this.packageId}::result::publish_result`,
             arguments: [

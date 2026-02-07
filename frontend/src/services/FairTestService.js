@@ -239,6 +239,7 @@ class FairTestService {
             examId,
             finalHash: identity.finalHash, // Only FINAL_HASH goes to blockchain
             answerHash: submissionPayload.answerHash,
+            answers, // Store answers for evaluator (in local storage)
             timeTaken
         });
         
