@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 function CreatorDashboard() {
     const [exams] = useState([
@@ -14,7 +16,7 @@ function CreatorDashboard() {
                     <h1 style={{ fontSize: '2rem', fontWeight: '700' }}>Creator Dashboard</h1>
                     <p style={{ color: 'var(--text-muted)' }}>Manage your decentralized exams and track payments.</p>
                 </div>
-                <Link to="/creator/create" className="btn-primary">+ Create New Exam</Link>
+                <Link href="/creator/create" className="btn-primary">+ Create New Exam</Link>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', marginBottom: '3rem' }}>

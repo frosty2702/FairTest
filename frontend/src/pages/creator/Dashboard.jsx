@@ -1,28 +1,35 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useWallet } from '@suiet/wallet-kit';
 import fairTestService from '../../services/FairTestService';
 import './Dashboard.css';
 
 const CreatorDashboard = () => {
+  const { address } = useWallet();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [recentExams, setRecentExams] = useState([]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (address) {
+      loadDashboardData();
+    } else {
+      setLoading(false);
+    }
+  }, [address]);
 
   const loadDashboardData = async () => {
+    if (!address) return;
     try {
       setLoading(true);
-      
-      // Connect wallet (in real app, this would be from wallet provider)
-      const mockWallet = '0x' + Math.random().toString(16).substring(2, 42);
-      await fairTestService.connectWallet(mockWallet);
+      setError(null);
+      await fairTestService.connectWallet(address);
       
       // Get real stats from Sui blockchain
-      const creatorStats = await fairTestService.getCreatorStats(mockWallet);
+      const creatorStats = await fairTestService.getCreatorStats(address);
       
       setStats([
         { icon: '💰', value: `${creatorStats.totalEarnings} SUI`, label: 'Total Earnings', trend: '-' },
@@ -56,6 +63,18 @@ const CreatorDashboard = () => {
     }
   };
 
+  if (!address) {
+    return (
+      <div className="creator-dashboard">
+        <div className="empty-state">
+          <h2>🔗 Connect Your Wallet</h2>
+          <p>Connect your Sui wallet (e.g. Suiet) to view your creator dashboard and manage exams.</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '1rem' }}>Use the Connect Wallet button in the top bar.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="creator-dashboard">
@@ -87,7 +106,7 @@ const CreatorDashboard = () => {
         <div className="empty-state">
           <h2>👋 Welcome to FairTest!</h2>
           <p>You haven't created any exams yet.</p>
-          <Link to="/creator/create" className="btn btn-primary">
+          <Link href="/creator/create" className="btn btn-primary">
             ✏️ Create Your First Exam
           </Link>
         </div>
@@ -122,7 +141,7 @@ const CreatorDashboard = () => {
       <div className="dashboard-section">
         <div className="section-header">
           <h2 className="section-title">Recent Exams</h2>
-          <Link to="/creator/exams" className="btn btn-ghost">
+          <Link href="/creator/exams" className="btn btn-ghost">
             View All →
           </Link>
         </div>
@@ -164,10 +183,10 @@ const CreatorDashboard = () => {
       </div>
 
       <div className="quick-actions">
-        <Link to="/creator/create" className="btn btn-primary">
+        <Link href="/creator/create" className="btn btn-primary">
           ✏️ Create New Exam
         </Link>
-        <Link to="/creator/analytics" className="btn btn-secondary">
+        <Link href="/creator/analytics" className="btn btn-secondary">
           📈 View Analytics
         </Link>
       </div>
