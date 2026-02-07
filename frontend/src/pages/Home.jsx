@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 function Home() {
   return (
@@ -13,8 +13,8 @@ function Home() {
           immutable blockchain results, and anonymous evaluation.
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-          <Link to="/creator" className="btn-primary" style={{ padding: '1rem 2rem' }}>Post an Exam</Link>
-          <Link to="/student/browse" className="btn-primary" style={{ padding: '1rem 2rem', background: 'transparent', border: '1px solid var(--primary)' }}>Browse Exams</Link>
+          <Link href="/creator" className="btn-primary" style={{ padding: '1rem 2rem' }}>Post an Exam</Link>
+          <Link href="/student/browse" className="btn-primary" style={{ padding: '1rem 2rem', background: 'transparent', border: '1px solid var(--primary)' }}>Browse Exams</Link>
         </div>
       </section>
 

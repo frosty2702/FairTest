@@ -1,11 +1,12 @@
+'use client';
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ENSManager from 'ens-integration';
-import PaymentFlow from 'yellow-integration';
+import { useRouter } from 'next/navigation';
+import fairTestService from '../../services/FairTestService';
 import QuestionBuilder from '../../components/QuestionBuilder';
 
 function CreateExam() {
-    const navigate = useNavigate();
+    const router = useRouter();
     const [step, setStep] = useState(1); // 1: metadata, 2: questions, 3: preview, 4: processing
     const [formData, setFormData] = useState({
         name: '',
@@ -59,50 +60,35 @@ function CreateExam() {
 
     const handlePublish = async () => {
         if (!validateExam()) return;
-        
+        if (!fairTestService.currentWallet) {
+            setValidationErrors(['Please connect your wallet first.']);
+            return;
+        }
+
         setStep(4);
         setIsProcessing(true);
+        setValidationErrors([]);
 
         try {
-            // 1. Yellow Payment
-            setPaymentStatus('Processing Yellow Payment...');
-            const payment = new PaymentFlow();
-            await payment.processListingPayment({
-                creatorWallet: '0x123...',
-                listingFee: 0.1,
-                examMetadata: { name: formData.name, questions: questions.length }
-            });
-
-            // 2. ENS Subdomain
-            setPaymentStatus('Registering ENS Subdomain...');
-            const ens = new ENSManager();
-            const { subdomain } = await ens.createExamSubdomain(formData.name, {
-                examName: formData.name,
-                examFee: formData.examFee,
+            setPaymentStatus('Processing Yellow payment...');
+            const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0);
+            const result = await fairTestService.createExam({
+                title: formData.name,
+                description: formData.description,
+                fee: formData.examFee,
                 duration: formData.duration,
-                questionCount: questions.length
+                passPercentage: 60,
+                instructions: formData.instructions || 'Read all questions carefully. Timer will auto-submit when time expires.',
+                questions
             });
-
-            // 3. Store questions off-chain (hash on-chain)
-            setPaymentStatus('Storing exam data...');
-            const questionHash = await hashQuestions(questions);
-            
-            // 4. Sui Object
-            setPaymentStatus('Minting Sui Exam Object...');
-            await new Promise(r => setTimeout(r, 1000));
 
             setPaymentStatus('Success!');
-            setTimeout(() => navigate('/creator'), 1500);
+            router.push('/creator');
         } catch (error) {
             console.error(error);
             setIsProcessing(false);
-            setValidationErrors([error.message]);
+            setValidationErrors([error.message || 'Failed to create exam.']);
         }
-    };
-
-    const hashQuestions = async (questions) => {
-        // In production, hash questions and store off-chain
-        return '0x' + Math.random().toString(16).substr(2, 64);
     };
 
     return (
