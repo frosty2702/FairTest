@@ -9,7 +9,8 @@ function GradeExam({ examId }) {
     const [submissions, setSubmissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState(null);
-    const [score, setScore] = useState('');
+    const [questionScores, setQuestionScores] = useState({});
+    const [feedback, setFeedback] = useState('');
     const [error, setError] = useState(null);
     const [publishing, setPublishing] = useState(false);
 
@@ -18,7 +19,7 @@ function GradeExam({ examId }) {
         fairTestService.getExam(examId)
             .then((data) => {
                 if (cancelled) return;
-                setExam({ id: data.examId, title: data.title, totalMarks: data.totalMarks });
+                setExam(data);
             })
             .catch((err) => { if (!cancelled) setError(err.message); });
         return () => { cancelled = true; };
@@ -35,33 +36,66 @@ function GradeExam({ examId }) {
         return () => { cancelled = true; };
     }, [examId]);
 
+    const handleSelectSubmission = (sub) => {
+        setSelected(sub);
+        // Initialize scores for each question
+        const scores = {};
+        if (exam && exam.questions) {
+            exam.questions.forEach((q, idx) => {
+                scores[idx] = 0;
+            });
+        }
+        setQuestionScores(scores);
+        setFeedback('');
+    };
+
+    const handleScoreChange = (questionIndex, value) => {
+        const numValue = parseInt(value, 10) || 0;
+        const maxMarks = exam.questions[questionIndex]?.marks || 0;
+        const clampedValue = Math.max(0, Math.min(numValue, maxMarks));
+        setQuestionScores(prev => ({
+            ...prev,
+            [questionIndex]: clampedValue
+        }));
+    };
+
+    const calculateTotalScore = () => {
+        return Object.values(questionScores).reduce((sum, score) => sum + score, 0);
+    };
+
     const handleGrade = async () => {
         if (!selected) return;
         if (!fairTestService.currentWallet) {
             setError('Please connect your wallet first.');
             return;
         }
-        const scoreNum = parseInt(score, 10);
-        if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
-            setError('Enter a score between 0 and 100.');
-            return;
-        }
+        
+        const totalScore = calculateTotalScore();
+        const maxScore = exam?.totalMarks || 100;
+        const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
+        
         setError(null);
         setPublishing(true);
         try {
-            const maxScore = selected.exam?.totalMarks ?? exam?.totalMarks ?? 100;
-            const percentage = maxScore > 0 ? Math.round((scoreNum / 100) * maxScore) : scoreNum;
+            const questionScoresArray = exam.questions.map((q, idx) => ({
+                questionIndex: idx,
+                score: questionScores[idx] || 0,
+                maxScore: q.marks
+            }));
+            
             await fairTestService.submitEvaluation(selected.submissionId, {
-                score: percentage,
+                score: totalScore,
                 maxScore,
-                percentage: scoreNum,
-                passed: scoreNum >= 60,
-                feedback: '',
-                questionScores: []
+                percentage,
+                passed: percentage >= (exam.passPercentage || 60),
+                feedback,
+                questionScores: questionScoresArray
             });
+            
             setSubmissions((prev) => prev.filter((s) => s.submissionId !== selected.submissionId));
             setSelected(null);
-            setScore('');
+            setQuestionScores({});
+            setFeedback('');
         } catch (err) {
             console.error(err);
             setError(err.message || 'Failed to publish result.');
@@ -98,61 +132,116 @@ function GradeExam({ examId }) {
             {loading ? (
                 <p style={{ color: 'var(--text-muted)' }}>Loading submissions...</p>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 350px' : '1fr', gap: '2rem' }}>
-                    <div className="glass-card" style={{ padding: '0' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
-                                    <th style={{ padding: '1rem' }}>FINAL_HASH (Anonymous)</th>
-                                    <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {submissions.map((sub) => (
-                                    <tr key={sub.submissionId} style={{ borderBottom: '1px solid var(--border)' }}>
-                                        <td style={{ padding: '1rem' }}><code style={{ color: 'var(--primary)' }}>{displayHash(sub)}</code></td>
-                                        <td style={{ padding: '1rem', textAlign: 'right' }}>
-                                            <button
-                                                onClick={() => setSelected(sub)}
-                                                style={{ color: 'var(--primary)' }}
-                                            >
-                                                Grade Submission
-                                            </button>
-                                        </td>
+                <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 450px' : '1fr', gap: '2rem' }}>
+                    <div>
+                        <div className="glass-card" style={{ padding: '0', marginBottom: '2rem' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
+                                        <th style={{ padding: '1rem' }}>FINAL_HASH (Anonymous)</th>
+                                        <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
                                     </tr>
+                                </thead>
+                                <tbody>
+                                    {submissions.map((sub) => (
+                                        <tr key={sub.submissionId} style={{ borderBottom: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '1rem' }}><code style={{ color: 'var(--primary)' }}>{displayHash(sub)}</code></td>
+                                            <td style={{ padding: '1rem', textAlign: 'right' }}>
+                                                <button
+                                                    onClick={() => handleSelectSubmission(sub)}
+                                                    className="btn-secondary"
+                                                    style={{ padding: '0.5rem 1rem' }}
+                                                >
+                                                    Grade Submission
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {submissions.length === 0 && !loading && (
+                                <p style={{ padding: '2rem', color: 'var(--text-muted)', textAlign: 'center' }}>No pending submissions for this exam.</p>
+                            )}
+                        </div>
+                        
+                        {selected && exam && exam.questions && (
+                            <div className="glass-card">
+                                <h3 style={{ marginBottom: '1.5rem' }}>Student Answers</h3>
+                                {exam.questions.map((question, idx) => (
+                                    <div key={idx} style={{ marginBottom: '2rem', paddingBottom: '2rem', borderBottom: idx < exam.questions.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                                        <div style={{ marginBottom: '1rem' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                                <strong>Question {idx + 1}</strong>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Max: {question.marks} marks</span>
+                                            </div>
+                                            <p style={{ color: 'var(--text-muted)' }}>{question.question}</p>
+                                        </div>
+                                        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
+                                            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Student Answer:</p>
+                                            <p>{selected.answers?.[idx] || 'No answer provided'}</p>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                        {submissions.length === 0 && !loading && (
-                            <p style={{ padding: '2rem', color: 'var(--text-muted)' }}>No pending submissions for this exam.</p>
+                            </div>
                         )}
                     </div>
 
-                    {selected && (
-                        <div className="glass-card">
-                            <h3 style={{ marginBottom: '1.5rem' }}>Grading {displayHash(selected)}</h3>
+                    {selected && exam && (
+                        <div className="glass-card" style={{ position: 'sticky', top: '100px', height: 'fit-content' }}>
+                            <h3 style={{ marginBottom: '1.5rem' }}>Grade Submission</h3>
                             <div style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '0.5rem', marginBottom: '2rem', fontSize: '0.875rem' }}>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Answer hash (anonymous):</p>
-                                <code>{(selected.answerHash || '').substring(0, 20)}...</code>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Anonymous ID:</p>
+                                <code>{displayHash(selected)}</code>
                             </div>
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Score (0-100)</label>
-                                <input
-                                    type="number"
-                                    value={score}
-                                    onChange={(e) => setScore(e.target.value)}
-                                    min={0}
-                                    max={100}
-                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'white' }}
+                            
+                            <div style={{ marginBottom: '2rem' }}>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Assign Marks</h4>
+                                {exam.questions && exam.questions.map((question, idx) => (
+                                    <div key={idx} style={{ marginBottom: '1rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                                            Q{idx + 1} (Max: {question.marks})
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={questionScores[idx] || 0}
+                                            onChange={(e) => handleScoreChange(idx, e.target.value)}
+                                            min={0}
+                                            max={question.marks}
+                                            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'white' }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div style={{ marginBottom: '2rem', padding: '1rem', background: 'rgba(255, 165, 0, 0.1)', borderRadius: '0.5rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <span>Total Score:</span>
+                                    <strong>{calculateTotalScore()} / {exam.totalMarks}</strong>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Percentage:</span>
+                                    <strong>{exam.totalMarks > 0 ? Math.round((calculateTotalScore() / exam.totalMarks) * 100) : 0}%</strong>
+                                </div>
+                            </div>
+                            
+                            <div style={{ marginBottom: '2rem' }}>
+                                <label style={{ display: 'block', marginBottom: '0.5rem' }}>Feedback (Optional)</label>
+                                <textarea
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    rows={4}
+                                    placeholder="Add feedback for the student..."
+                                    style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'white', resize: 'vertical' }}
                                 />
                             </div>
+                            
                             <button
                                 onClick={handleGrade}
                                 className="btn-primary"
                                 style={{ width: '100%' }}
                                 disabled={publishing}
                             >
-                                {publishing ? 'Publishing...' : 'Publish Result to Sui'}
+                                {publishing ? 'Publishing...' : 'Publish Result to Blockchain'}
                             </button>
                         </div>
                     )}

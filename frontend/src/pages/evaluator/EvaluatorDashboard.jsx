@@ -34,17 +34,26 @@ function EvaluatorDashboard() {
         if (!selectedExamId) return;
         let cancelled = false;
         setLoading(true);
+        console.log('[Evaluator] Loading submissions for exam:', selectedExamId);
         Promise.all([
             fairTestService.getPendingSubmissions(selectedExamId),
             fairTestService.getExam(selectedExamId)
         ])
             .then(([subs, exam]) => {
                 if (!cancelled) {
+                    console.log('[Evaluator] Loaded submissions:', subs);
+                    console.log('[Evaluator] Loaded exam:', exam);
                     setSubmissions(subs);
                     setExamData(exam);
                 }
             })
-            .catch((err) => { if (!cancelled) { setError(err.message); setSubmissions([]); } })
+            .catch((err) => { 
+                if (!cancelled) { 
+                    console.error('[Evaluator] Error loading:', err);
+                    setError(err.message); 
+                    setSubmissions([]); 
+                } 
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [selectedExamId]);
@@ -80,6 +89,14 @@ function EvaluatorDashboard() {
             return;
         }
 
+        // For manual grading questions, use entered score or default to 0
+        const manualGradingQuestions = autoEvalResult.manualGrading || [];
+        manualGradingQuestions.forEach(qId => {
+            if (manualScores[qId] === undefined || manualScores[qId] === null || manualScores[qId] === '') {
+                manualScores[qId] = 0; // Default to 0 if not entered
+            }
+        });
+
         setError(null);
         setPublishing(true);
 
@@ -87,6 +104,9 @@ function EvaluatorDashboard() {
             // Merge auto and manual scores
             const evaluator = new AutoEvaluator();
             const finalResult = evaluator.mergeFinalScore(autoEvalResult, manualScores);
+
+            console.log('[Evaluator] Publishing result:', finalResult);
+            console.log('[Evaluator] Manual scores:', manualScores);
 
             await fairTestService.submitEvaluation(selected.submissionId, {
                 score: finalResult.totalScore,
@@ -97,16 +117,22 @@ function EvaluatorDashboard() {
                 questionScores: finalResult.questionScores
             });
 
+            console.log('[Evaluator] ✅ Result published successfully');
             setSubmissions((prev) => prev.filter((s) => s.submissionId !== selected.submissionId));
             setSelected(null);
             setAutoEvalResult(null);
             setManualScores({});
         } catch (err) {
-            console.error(err);
+            console.error('[Evaluator] Publish error:', err);
             setError(err.message || 'Failed to publish result.');
         } finally {
             setPublishing(false);
         }
+    };
+
+    // Always allow publishing - will default manual scores to 0
+    const canPublish = () => {
+        return !!autoEvalResult && !publishing;
     };
 
     const displayHash = (sub) => (sub.finalHash || '').substring(0, 12) + '...';
@@ -218,15 +244,18 @@ function EvaluatorDashboard() {
 
                                                 {questionResult && !questionResult.autoGraded && (
                                                     <div style={{ marginTop: '0.5rem' }}>
-                                                        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Manual Score (0-{q.marks})</label>
+                                                        <label style={{ display: 'block', fontSize: '0.875rem', marginBottom: '0.25rem', fontWeight: '600', color: 'var(--orange-primary)' }}>
+                                                            ⚠️ Manual Score Required (0-{q.marks})
+                                                        </label>
                                                         <input
                                                             type="number"
                                                             min={0}
                                                             max={q.marks}
                                                             step={0.5}
-                                                            value={manualScores[q.id] || 0}
+                                                            value={manualScores[q.id] !== undefined ? manualScores[q.id] : ''}
                                                             onChange={(e) => handleManualScoreChange(q.id, e.target.value)}
-                                                            style={{ width: '100px', padding: '0.5rem', borderRadius: '0.25rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'white' }}
+                                                            placeholder="Enter score..."
+                                                            style={{ width: '100%', padding: '0.75rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '2px solid var(--orange-primary)', color: 'white', fontSize: '1rem' }}
                                                         />
                                                     </div>
                                                 )}
@@ -237,13 +266,29 @@ function EvaluatorDashboard() {
                             )}
 
                             <button
-                                onClick={handlePublishResult}
+                                onClick={() => {
+                                    console.log('[Evaluator] Button clicked!');
+                                    console.log('[Evaluator] canPublish:', canPublish());
+                                    console.log('[Evaluator] autoEvalResult:', autoEvalResult);
+                                    console.log('[Evaluator] publishing:', publishing);
+                                    handlePublishResult();
+                                }}
                                 className="btn-primary"
-                                style={{ width: '100%' }}
-                                disabled={publishing || !autoEvalResult}
+                                style={{ 
+                                    width: '100%',
+                                    opacity: canPublish() ? 1 : 0.5,
+                                    cursor: canPublish() ? 'pointer' : 'not-allowed'
+                                }}
+                                disabled={!canPublish()}
                             >
-                                {publishing ? 'Publishing...' : 'Publish Result to Sui'}
+                                {publishing ? 'Publishing to Blockchain...' : 'Publish Result to Sui'}
                             </button>
+                            
+                            {autoEvalResult && autoEvalResult.manualGrading.length > 0 && (
+                                <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                                    💡 Enter scores above or leave blank for 0 points
+                                </p>
+                            )}
                         </div>
                     )}
                 </div>

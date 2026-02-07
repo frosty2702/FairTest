@@ -22,20 +22,30 @@ function BrowseExams() {
     }, []);
 
     const handleRegister = async (exam) => {
+        console.log('[BrowseExams] Register clicked for exam:', exam.examId);
+        console.log('[BrowseExams] Current wallet:', fairTestService.currentWallet);
+        
         if (!fairTestService.currentWallet) {
             setError('Please connect your wallet to register for exams. Click "Connect Wallet" in the top-right corner.');
             return;
         }
+        
         setIsProcessing(true);
         setStatus(`Registering for ${exam.title}...`);
         setError(null);
 
         try {
-            await fairTestService.registerForExam(exam.examId);
+            console.log('[BrowseExams] Calling registerForExam...');
+            const result = await fairTestService.registerForExam(exam.examId);
+            console.log('[BrowseExams] Registration result:', result);
             setStatus('Registration successful!');
-            router.push(`/student/exam/${exam.examId}/instructions`);
+            
+            // Wait a moment to show success message
+            setTimeout(() => {
+                router.push(`/student/exam/${exam.examId}/instructions`);
+            }, 1000);
         } catch (err) {
-            console.error(err);
+            console.error('[BrowseExams] Registration error:', err);
             setError(err.message || 'Registration failed.');
             setIsProcessing(false);
         }

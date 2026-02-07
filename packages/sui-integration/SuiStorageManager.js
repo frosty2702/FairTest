@@ -195,13 +195,50 @@ export default class SuiStorageManager {
         console.log('[Sui] ✅ Platform fee paid:', 0.01, 'SUI');
         console.log('[Sui] Tx digest:', txDigest);
 
-        // Store exam ID in local storage for browsing
+        // Store exam metadata in local storage for browsing
         if (typeof window !== 'undefined' && window.localStorage) {
+            const examMetadata = {
+                examId,
+                objectId,
+                title: examData.title,
+                description: examData.description,
+                creator: examData.creatorWallet,
+                fee: examData.fee,
+                duration: examData.duration,
+                passPercentage: examData.passPercentage || 60,
+                questions: examData.questions || [],
+                totalMarks: (examData.questions || []).reduce((sum, q) => sum + (q.marks || 0), 0),
+                createdAt: Date.now(),
+                status: 'active'
+            };
+            
+            // Store in exam list
             const stored = localStorage.getItem('fairtest_exam_ids');
             const examIds = stored ? JSON.parse(stored) : [];
             if (!examIds.includes(examId)) {
                 examIds.push(examId);
                 localStorage.setItem('fairtest_exam_ids', JSON.stringify(examIds));
+            }
+            
+            // Store full exam metadata
+            localStorage.setItem(`fairtest_exam_${examId}`, JSON.stringify(examMetadata));
+            console.log('[Sui] ✅ Exam metadata stored in local storage');
+        }
+
+        // Store in ENS if available
+        if (this.ensManager) {
+            try {
+                await this.ensManager.createExamSubdomain(examData.title, {
+                    examId,
+                    examName: examData.title,
+                    creatorWallet: examData.creatorWallet,
+                    examFee: examData.fee,
+                    description: examData.description,
+                    questions: examData.questions
+                });
+                await this.ensManager.setExamMetadata(`${examData.title.toLowerCase().replace(/\s+/g, '-')}.fairtest.sim`, examId, examData);
+            } catch (e) {
+                console.warn('[Sui] ENS metadata storage failed:', e.message);
             }
         }
 
@@ -265,6 +302,19 @@ export default class SuiStorageManager {
 
     async getExam(examId) {
         this._requirePackageId();
+        
+        // Try local storage first
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const metadataKey = `fairtest_exam_${examId}`;
+            const metadata = localStorage.getItem(metadataKey);
+            if (metadata) {
+                console.log('[Sui] ✅ Exam loaded from local storage:', examId);
+                return JSON.parse(metadata);
+            }
+        }
+        
+        // Fallback to blockchain (slower)
+        console.log('[Sui] Loading exam from blockchain:', examId);
         const obj = await this.client.getObject({
             id: examId,
             options: { showContent: true }
@@ -273,36 +323,17 @@ export default class SuiStorageManager {
         const parsed = this._parseExamObject(obj.data);
         if (!parsed) throw new Error(`Invalid exam object: ${examId}`);
 
-        let title = '';
-        let description = '';
-        let questions = [];
-        let totalMarks = 0;
-        if (this.ensManager) {
-            try {
-                const list = await this.ensManager.getExamList();
-                const meta = list.find(e => e.examId === examId);
-                if (meta) {
-                    title = meta.examName ?? meta.title ?? '';
-                    description = meta.description ?? '';
-                    questions = Array.isArray(meta.questions) ? meta.questions : [];
-                    totalMarks = questions.reduce((sum, q) => sum + (q.marks ?? 0), 0);
-                }
-            } catch (e) {
-                console.warn('[Sui] ENS metadata lookup failed:', e.message);
-            }
-        }
-
         return {
             examId,
             objectId: examId,
-            title,
-            description,
+            title: '',
+            description: '',
             creator: parsed.creator,
             duration: 60,
             fee: String(Number(parsed.exam_fee) / 1e9),
             passPercentage: 40,
-            questions,
-            totalMarks,
+            questions: [],
+            totalMarks: 0,
             createdAt: parsed.timestamp,
             status: parsed.status === 1 ? 'active' : 'completed',
             ensDomain: parsed.ens_name,
@@ -316,36 +347,33 @@ export default class SuiStorageManager {
         try {
             console.log('[Sui] Loading exams from local storage...');
             
-            // Get exam IDs from local storage (stored when exams are created)
-            const examIds = [];
+            const exams = [];
             if (typeof window !== 'undefined' && window.localStorage) {
                 const stored = localStorage.getItem('fairtest_exam_ids');
                 if (stored) {
-                    examIds.push(...JSON.parse(stored));
-                }
-            }
-            
-            if (examIds.length === 0) {
-                console.log('[Sui] ⚠️  No exams found in local storage');
-                console.log('[Sui] Create an exam first, or enter exam ID manually');
-                return [];
-            }
-            
-            console.log('[Sui] Found', examIds.length, 'exam IDs, loading details...');
-            
-            const exams = [];
-            for (const examId of examIds) {
-                try {
-                    const exam = await this.getExam(examId);
-                    if (exam && exam.status === 'active') {
-                        exams.push(exam);
+                    const examIds = JSON.parse(stored);
+                    console.log('[Sui] Found', examIds.length, 'exam IDs');
+                    
+                    for (const examId of examIds) {
+                        const metadataKey = `fairtest_exam_${examId}`;
+                        const metadata = localStorage.getItem(metadataKey);
+                        if (metadata) {
+                            const exam = JSON.parse(metadata);
+                            if (exam.status === 'active') {
+                                exams.push(exam);
+                            }
+                        }
                     }
-                } catch (error) {
-                    console.warn('[Sui] Failed to load exam', examId, ':', error.message);
                 }
             }
             
-            console.log('[Sui] Loaded', exams.length, 'active exams');
+            if (exams.length === 0) {
+                console.log('[Sui] ⚠️  No exams found in local storage');
+                console.log('[Sui] Create an exam first to see it in the browse list');
+            } else {
+                console.log('[Sui] Loaded', exams.length, 'active exams');
+            }
+            
             return exams;
         } catch (error) {
             console.error('[Sui] Error loading exams:', error);
@@ -396,6 +424,8 @@ export default class SuiStorageManager {
                 examId: submissionData.examId,
                 answers: submissionData.answers,
                 timeTaken: submissionData.timeTaken,
+                finalHash: bytesToHex(uidHash),
+                answerHash: bytesToHex(answerHash),
                 timestamp: Date.now()
             }));
         }
@@ -434,6 +464,29 @@ export default class SuiStorageManager {
 
     async getSubmission(submissionId) {
         this._requirePackageId();
+        
+        // Try local storage first
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const storageKey = `fairtest_submission_${submissionId}`;
+            const stored = localStorage.getItem(storageKey);
+            if (stored) {
+                const data = JSON.parse(stored);
+                console.log('[Sui] ✅ Submission loaded from local storage:', submissionId);
+                return {
+                    submissionId: data.submissionId,
+                    objectId: submissionId,
+                    examId: data.examId,
+                    finalHash: data.finalHash || 'anonymous',
+                    answerHash: data.answerHash || '',
+                    answers: data.answers,
+                    submittedAt: data.timestamp,
+                    timeTaken: data.timeTaken || 0,
+                    status: 'pending_evaluation'
+                };
+            }
+        }
+        
+        // Fallback to blockchain
         const obj = await this.client.getObject({
             id: submissionId,
             options: { showContent: true }
@@ -442,28 +495,15 @@ export default class SuiStorageManager {
         const parsed = this._parseSubmissionObject(obj.data);
         if (!parsed) throw new Error(`Invalid submission object: ${submissionId}`);
         
-        // Retrieve answers from local storage
-        let answers = null;
-        let timeTaken = 0;
-        if (typeof window !== 'undefined' && window.localStorage) {
-            const storageKey = `fairtest_submission_${submissionId}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                const data = JSON.parse(stored);
-                answers = data.answers;
-                timeTaken = data.timeTaken || 0;
-            }
-        }
-        
         return {
             submissionId,
             objectId: submissionId,
             examId: parsed.examId,
             finalHash: parsed.finalHash,
             answerHash: parsed.answerHash,
-            answers, // Include actual answers for evaluator
+            answers: null,
             submittedAt: parsed.timestamp,
-            timeTaken,
+            timeTaken: 0,
             status: 'pending_evaluation'
         };
     }
@@ -487,26 +527,78 @@ export default class SuiStorageManager {
 
     async getPendingSubmissions(examId) {
         this._requirePackageId();
-        const resultIds = this.ensManager ? await this.ensManager.getResultIds(examId) : [];
-        const resultUidHashes = new Set();
-        for (const rid of resultIds) {
-            try {
-                const ro = await this.client.getObject({ id: rid, options: { showContent: true } });
-                const c = ro.data?.content;
-                if (c?.dataType === 'moveObject' && c.fields?.uid_hash) {
-                    resultUidHashes.add(bytesToHex(c.fields.uid_hash));
+        
+        console.log('[Sui] Getting pending submissions for exam:', examId);
+        
+        // Get all submissions from local storage
+        const submissions = [];
+        if (typeof window !== 'undefined' && window.localStorage) {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('fairtest_submission_')) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        console.log('[Sui] Found submission:', data.submissionId, 'for exam:', data.examId);
+                        
+                        if (data.examId === examId) {
+                            // Check if already graded
+                            const resultKey = `fairtest_result_${data.submissionId}`;
+                            const hasResult = localStorage.getItem(resultKey);
+                            
+                            if (!hasResult) {
+                                console.log('[Sui] Submission pending:', data.submissionId);
+                                submissions.push({
+                                    submissionId: data.submissionId,
+                                    examId: data.examId,
+                                    answers: data.answers,
+                                    timeTaken: data.timeTaken,
+                                    submittedAt: data.timestamp,
+                                    finalHash: data.finalHash || 'anonymous',
+                                    status: 'pending_evaluation'
+                                });
+                            } else {
+                                console.log('[Sui] Submission already graded:', data.submissionId);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('[Sui] Error parsing submission:', key, e);
+                    }
                 }
-            } catch (_) {}
+            }
         }
-        const submissions = await this.getExamSubmissions(examId);
-        return submissions.filter(s => !resultUidHashes.has(s.finalHash));
+        
+        console.log('[Sui] Found', submissions.length, 'pending submissions');
+        
+        // Get exam details
+        const exam = await this.getExam(examId);
+        
+        return submissions.map(sub => ({
+            ...sub,
+            exam
+        }));
     }
 
     async storeResult(resultData) {
         this._requirePackageId();
-        const uidHash = typeof resultData.studentFinalHash === 'string'
-            ? hexToBytes(resultData.studentFinalHash.startsWith('0x') ? resultData.studentFinalHash.slice(2) : resultData.studentFinalHash)
-            : this._bytesArg(resultData.studentFinalHash);
+        
+        // Handle finalHash - it might be a string or need conversion
+        let uidHash;
+        if (typeof resultData.studentFinalHash === 'string') {
+            const hashStr = resultData.studentFinalHash.startsWith('0x') 
+                ? resultData.studentFinalHash.slice(2) 
+                : resultData.studentFinalHash;
+            
+            // If it's "anonymous" or invalid, generate a dummy hash
+            if (hashStr === 'anonymous' || hashStr.length === 0 || !/^[0-9a-fA-F]+$/.test(hashStr)) {
+                console.warn('[Sui] Invalid finalHash, generating dummy hash');
+                uidHash = new Uint8Array(32).fill(0); // 32 bytes of zeros
+            } else {
+                uidHash = hexToBytes(hashStr);
+            }
+        } else {
+            uidHash = this._bytesArg(resultData.studentFinalHash);
+        }
+        
         const examIdBytes = new TextEncoder().encode(resultData.examId);
         const score = BigInt(Math.floor(Number(resultData.score ?? 0)));
         const maxScore = BigInt(Math.floor(Number(resultData.maxScore ?? 100)));
@@ -530,6 +622,65 @@ export default class SuiStorageManager {
         if (!objectId) throw new Error('Failed to get created result object ID');
 
         const resultId = objectId;
+        
+        // Get exam details for pass percentage
+        const exam = await this.getExam(resultData.examId);
+        const passPercentage = exam.passPercentage || 60;
+        
+        // Store result in local storage
+        if (typeof window !== 'undefined' && window.localStorage) {
+            const resultKey = `fairtest_result_${resultData.submissionId}`;
+            const percentage = resultData.maxScore ? (Number(resultData.score) / Number(resultData.maxScore)) * 100 : 0;
+            const passed = percentage >= passPercentage;
+            
+            const resultObj = {
+                resultId,
+                submissionId: resultData.submissionId,
+                examId: resultData.examId,
+                studentFinalHash: resultData.studentFinalHash,
+                evaluatorFinalHash: resultData.evaluatorFinalHash,
+                score: resultData.score,
+                maxScore: resultData.maxScore,
+                percentage: Math.round(percentage * 10) / 10,
+                passed,
+                feedback: resultData.feedback || '',
+                questionScores: resultData.questionScores || [],
+                evaluatedAt: Date.now(),
+                txDigest
+            };
+            
+            localStorage.setItem(resultKey, JSON.stringify(resultObj));
+            console.log('[Sui] ✅ Result stored in local storage:', resultKey);
+            console.log('[Sui] Result data:', resultObj);
+            
+            // Update creator earnings
+            const creatorEarnings = localStorage.getItem('fairtest_creator_earnings') || '{}';
+            const earnings = JSON.parse(creatorEarnings);
+            if (!earnings[exam.creator]) {
+                earnings[exam.creator] = {
+                    totalEarnings: 0,
+                    totalStudents: 0,
+                    exams: {}
+                };
+            }
+            if (!earnings[exam.creator].exams[resultData.examId]) {
+                earnings[exam.creator].exams[resultData.examId] = {
+                    examTitle: exam.title,
+                    fee: exam.fee,
+                    students: 0,
+                    earnings: 0
+                };
+            }
+            // Each submission counts as earnings (student paid when registering)
+            earnings[exam.creator].exams[resultData.examId].students += 1;
+            earnings[exam.creator].exams[resultData.examId].earnings += parseFloat(exam.fee);
+            earnings[exam.creator].totalStudents += 1;
+            earnings[exam.creator].totalEarnings += parseFloat(exam.fee);
+            
+            localStorage.setItem('fairtest_creator_earnings', JSON.stringify(earnings));
+            console.log('[Sui] ✅ Creator earnings updated');
+        }
+        
         if (this.ensManager) {
             try {
                 await this.ensManager.appendResultId(resultData.examId, resultId);
@@ -588,30 +739,76 @@ export default class SuiStorageManager {
 
     async getStudentResults(studentFinalHash) {
         this._requirePackageId();
-        const hashHex = studentFinalHash.startsWith('0x') ? studentFinalHash : `0x${studentFinalHash}`;
         const results = [];
-        if (!this.ensManager) return results;
-        const list = await this.ensManager.getExamList();
-        for (const e of list) {
-            if (!e.examId) continue;
-            const resultIds = await this.ensManager.getResultIds(e.examId);
-            for (const rid of resultIds) {
-                try {
-                    const ro = await this.client.getObject({ id: rid, options: { showContent: true } });
-                    const c = ro.data?.content;
-                    if (c?.dataType === 'moveObject' && c.fields?.uid_hash && bytesToHex(c.fields.uid_hash) === hashHex) {
-                        const parsed = this._parseResultObject(ro.data, rid);
-                        if (parsed) {
-                            parsed.submissionId = null;
-                            parsed.maxScore = parsed.score;
-                            parsed.percentage = parsed.score;
-                            parsed.passed = parsed.score >= 40;
-                            results.push(parsed);
+        
+        console.log('[Sui] Getting results for finalHash:', studentFinalHash);
+        
+        // Get results from local storage
+        if (typeof window !== 'undefined' && window.localStorage) {
+            // First, try to find results by finalHash
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('fairtest_result_')) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        console.log('[Sui] Checking result:', data.submissionId, 'finalHash:', data.studentFinalHash);
+                        
+                        if (data.studentFinalHash === studentFinalHash) {
+                            // Get exam details
+                            const exam = await this.getExam(data.examId);
+                            results.push({
+                                ...data,
+                                examTitle: exam.title,
+                                examTotalMarks: exam.totalMarks
+                            });
                         }
+                    } catch (e) {
+                        console.error('[Sui] Error parsing result:', key, e);
                     }
-                } catch (_) {}
+                }
+            }
+            
+            // If no results found by finalHash, try to match by exam IDs from student's submissions
+            if (results.length === 0) {
+                console.log('[Sui] No results found by finalHash, checking all results...');
+                
+                // Get all exam IDs the student has taken
+                const studentExamIds = new Set();
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('fairtest_uid_')) {
+                        try {
+                            const identity = JSON.parse(localStorage.getItem(key));
+                            if (identity.finalHash === studentFinalHash) {
+                                studentExamIds.add(identity.examId);
+                            }
+                        } catch (e) {}
+                    }
+                }
+                
+                console.log('[Sui] Student exam IDs:', Array.from(studentExamIds));
+                
+                // Get results for those exams
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('fairtest_result_')) {
+                        try {
+                            const data = JSON.parse(localStorage.getItem(key));
+                            if (studentExamIds.has(data.examId)) {
+                                const exam = await this.getExam(data.examId);
+                                results.push({
+                                    ...data,
+                                    examTitle: exam.title,
+                                    examTotalMarks: exam.totalMarks
+                                });
+                            }
+                        } catch (e) {}
+                    }
+                }
             }
         }
+        
+        console.log(`[Sui] Retrieved ${results.length} results from local storage`);
         return results;
     }
 

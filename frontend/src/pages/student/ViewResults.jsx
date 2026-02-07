@@ -53,15 +53,49 @@ function ViewResults() {
                                     )}
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--primary)' }}>{res.percentage ?? res.score}</div>
-                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Score{res.maxScore != null ? ` / ${res.maxScore}` : ''}</div>
+                                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: res.passed ? 'var(--success)' : 'var(--error)' }}>
+                                        {res.score || 0}/{res.maxScore || 100}
+                                    </div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{res.percentage || 0}%</div>
                                 </div>
                             </div>
+                            
+                            {res.questionScores && res.questionScores.length > 0 && (
+                                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(0,0,0,0.2)', borderRadius: '0.5rem' }}>
+                                    <h4 style={{ fontSize: '0.875rem', marginBottom: '1rem', color: 'var(--text-muted)' }}>Question Breakdown</h4>
+                                    <div style={{ display: 'grid', gap: '0.5rem' }}>
+                                        {res.questionScores.map((qs, idx) => (
+                                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                                                <span>Question {qs.questionIndex + 1}</span>
+                                                <span style={{ fontWeight: '600' }}>{qs.score}/{qs.maxScore}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {res.feedback && (
+                                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255, 165, 0, 0.1)', borderRadius: '0.5rem' }}>
+                                    <h4 style={{ fontSize: '0.875rem', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>Evaluator Feedback</h4>
+                                    <p style={{ fontSize: '0.875rem' }}>{res.feedback}</p>
+                                </div>
+                            )}
+                            
                             <div style={{ display: 'flex', gap: '3rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
                                 <div>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{res.passed ? 'Pass' : 'Fail'}</div>
+                                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: res.passed ? 'var(--success)' : 'var(--error)' }}>
+                                        {res.passed ? '✅ Pass' : '❌ Fail'}
+                                    </div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</div>
                                 </div>
+                                {res.evaluatedAt && (
+                                    <div>
+                                        <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                            {new Date(res.evaluatedAt).toLocaleDateString()}
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Evaluated</div>
+                                    </div>
+                                )}
                                 {res.resultId && (
                                     <div>
                                         <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
@@ -71,10 +105,10 @@ function ViewResults() {
                                                 rel="noopener noreferrer"
                                                 style={{ color: 'var(--primary)', textDecoration: 'underline' }}
                                             >
-                                                View on Sui Explorer
+                                                View on Explorer
                                             </a>
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Result Object</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Blockchain Proof</div>
                                     </div>
                                 )}
                             </div>

@@ -5,17 +5,22 @@
 
 import SuiStorageManager from '../../../packages/sui-integration/SuiStorageManager.js';
 import AnonymousIDManager from '../../../packages/identity/AnonymousIDManager.js';
+import ENSManager from '../../../packages/ens-integration/ENSManager.js';
 
 class FairTestService {
     constructor() {
         console.log('[FairTest] ✅ Sui-only mode');
         console.log('[FairTest] Payments via Slush wallet');
         
+        // Initialize ENS Manager (mock/simulated)
+        this.ens = new ENSManager();
+        
         this.sui = new SuiStorageManager({ 
             packageId: process.env.NEXT_PUBLIC_SUI_PACKAGE_ID,
             network: process.env.NEXT_PUBLIC_SUI_NETWORK || 'testnet',
             rpcUrl: process.env.NEXT_PUBLIC_SUI_RPC_URL,
-            privateKey: process.env.NEXT_PUBLIC_SUI_PRIVATE_KEY
+            privateKey: process.env.NEXT_PUBLIC_SUI_PRIVATE_KEY,
+            ensManager: this.ens // Pass ENS to Sui manager
         });
         this.identity = new AnonymousIDManager();
         
@@ -113,20 +118,42 @@ class FairTestService {
      * CREATOR: Get creator dashboard stats
      */
     async getCreatorStats(creatorWallet) {
-        const allExams = await this.sui.getAllExams();
-        const myExams = allExams.filter(e => e.creator === creatorWallet);
-        
+        // Get earnings from local storage
         let totalEarnings = 0;
         let totalStudents = 0;
         let platformFees = 0;
+        let myExams = [];
         
-        for (const exam of myExams) {
-            const stats = await this.sui.getExamStats(exam.examId);
-            totalStudents += stats.totalSubmissions;
-            totalEarnings += stats.totalSubmissions * parseFloat(exam.fee);
+        if (typeof window !== 'undefined' && window.localStorage) {
+            // Get all exams created by this creator
+            const stored = localStorage.getItem('fairtest_exam_ids');
+            if (stored) {
+                const examIds = JSON.parse(stored);
+                for (const examId of examIds) {
+                    const metadataKey = `fairtest_exam_${examId}`;
+                    const metadata = localStorage.getItem(metadataKey);
+                    if (metadata) {
+                        const exam = JSON.parse(metadata);
+                        if (exam.creator === creatorWallet) {
+                            myExams.push(exam);
+                        }
+                    }
+                }
+            }
+            
+            // Get earnings data
+            const earningsData = localStorage.getItem('fairtest_creator_earnings');
+            if (earningsData) {
+                const earnings = JSON.parse(earningsData);
+                if (earnings[creatorWallet]) {
+                    totalEarnings = earnings[creatorWallet].totalEarnings || 0;
+                    totalStudents = earnings[creatorWallet].totalStudents || 0;
+                }
+            }
+            
+            // Platform fees: 0.01 SUI per exam created
+            platformFees = myExams.length * 0.01;
         }
-        
-        platformFees = myExams.length * 0.1; // 0.1 SUI per exam listing
         
         return {
             totalEarnings: totalEarnings.toFixed(2),
