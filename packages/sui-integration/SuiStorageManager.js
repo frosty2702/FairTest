@@ -194,7 +194,9 @@ export default class SuiStorageManager {
     }
 
     async getAllExams() {
-        if (!this.ensManager) return [];
+        if (!this.ensManager) {
+            throw new Error('ENS Manager not configured. Cannot retrieve exam list without ENS.');
+        }
         const list = await this.ensManager.getExamList();
         const exams = [];
         for (const e of list) {
@@ -202,7 +204,10 @@ export default class SuiStorageManager {
             try {
                 const exam = await this.getExam(e.examId);
                 if (exam.status === 'active') exams.push(exam);
-            } catch (_) {}
+            } catch (error) {
+                console.error(`[Sui] Failed to load exam ${e.examId}:`, error.message);
+                throw new Error(`Failed to load exam ${e.examId} from Sui: ${error.message}`);
+            }
         }
         return exams;
     }
@@ -323,13 +328,18 @@ export default class SuiStorageManager {
     }
 
     async getExamSubmissions(examId) {
-        if (!this.ensManager) return [];
+        if (!this.ensManager) {
+            throw new Error('ENS Manager not configured. Cannot retrieve submissions without ENS.');
+        }
         const ids = await this.ensManager.getSubmissionIds(examId);
         const out = [];
         for (const id of ids) {
             try {
                 out.push(await this.getSubmission(id));
-            } catch (_) {}
+            } catch (error) {
+                console.error(`[Sui] Failed to load submission ${id}:`, error.message);
+                throw new Error(`Failed to load submission ${id} from Sui: ${error.message}`);
+            }
         }
         return out;
     }

@@ -82,8 +82,18 @@ function CreateExam() {
                 questions
             });
 
-            setPaymentStatus('Success!');
-            router.push('/creator');
+            // Show transaction details
+            console.log('✅ Exam Created Successfully!');
+            console.log('📦 Exam ID:', result.examId);
+            console.log('🔗 Transaction:', result.txDigest);
+            console.log('🌐 View on Sui Explorer:', `https://suiscan.xyz/testnet/tx/${result.txDigest}`);
+            
+            setPaymentStatus(`Success! Exam created on Sui blockchain. Tx: ${result.txDigest?.substring(0, 10)}...`);
+            
+            // Wait a moment to show the success message
+            setTimeout(() => {
+                router.push('/creator');
+            }, 2000);
         } catch (error) {
             console.error(error);
             setIsProcessing(false);

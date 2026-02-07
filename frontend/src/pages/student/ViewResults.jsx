@@ -37,7 +37,17 @@ function ViewResults() {
                                 <div>
                                     <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{res.examTitle}</h3>
                                     {res.txDigest ? (
-                                        <span className="badge badge-success">Verified on Sui</span>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <span className="badge badge-success">Verified on Sui</span>
+                                            <a 
+                                                href={`https://suiscan.xyz/testnet/tx/${res.txDigest}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ fontSize: '0.75rem', color: 'var(--primary)', textDecoration: 'underline' }}
+                                            >
+                                                View Transaction: {res.txDigest.substring(0, 10)}...
+                                            </a>
+                                        </div>
                                     ) : (
                                         <span className="badge" style={{ backgroundColor: 'rgba(148, 163, 184, 0.1)', color: 'var(--text-muted)' }}>Recorded</span>
                                     )}
@@ -52,6 +62,21 @@ function ViewResults() {
                                     <div style={{ fontSize: '1.25rem', fontWeight: '700' }}>{res.passed ? 'Pass' : 'Fail'}</div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status</div>
                                 </div>
+                                {res.resultId && (
+                                    <div>
+                                        <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
+                                            <a 
+                                                href={`https://suiscan.xyz/testnet/object/${res.resultId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ color: 'var(--primary)', textDecoration: 'underline' }}
+                                            >
+                                                View on Sui Explorer
+                                            </a>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Result Object</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
