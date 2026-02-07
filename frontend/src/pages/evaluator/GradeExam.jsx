@@ -4,9 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import fairTestService from '../../services/FairTestService';
 
-function EvaluatorDashboard() {
-    const [exams, setExams] = useState([]);
-    const [selectedExamId, setSelectedExamId] = useState(null);
+function GradeExam({ examId }) {
+    const [exam, setExam] = useState(null);
     const [submissions, setSubmissions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selected, setSelected] = useState(null);
@@ -16,27 +15,25 @@ function EvaluatorDashboard() {
 
     useEffect(() => {
         let cancelled = false;
-        fairTestService.browseExams()
-            .then((list) => {
+        fairTestService.getExam(examId)
+            .then((data) => {
                 if (cancelled) return;
-                setExams(list);
-                if (list.length > 0 && !selectedExamId) setSelectedExamId(list[0].examId);
+                setExam({ id: data.examId, title: data.title, totalMarks: data.totalMarks });
             })
-            .catch((err) => { if (!cancelled) setError(err.message); })
-            .finally(() => { if (!cancelled) setLoading(false); });
+            .catch((err) => { if (!cancelled) setError(err.message); });
         return () => { cancelled = true; };
-    }, []);
+    }, [examId]);
 
     useEffect(() => {
-        if (!selectedExamId) return;
+        if (!examId) return;
         let cancelled = false;
         setLoading(true);
-        fairTestService.getPendingSubmissions(selectedExamId)
+        fairTestService.getPendingSubmissions(examId)
             .then((list) => { if (!cancelled) setSubmissions(list); })
             .catch((err) => { if (!cancelled) setError(err.message); setSubmissions([]); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [selectedExamId]);
+    }, [examId]);
 
     const handleGrade = async () => {
         if (!selected) return;
@@ -52,7 +49,7 @@ function EvaluatorDashboard() {
         setError(null);
         setPublishing(true);
         try {
-            const maxScore = selected.exam?.totalMarks ?? 100;
+            const maxScore = selected.exam?.totalMarks ?? exam?.totalMarks ?? 100;
             const percentage = maxScore > 0 ? Math.round((scoreNum / 100) * maxScore) : scoreNum;
             await fairTestService.submitEvaluation(selected.submissionId, {
                 score: percentage,
@@ -75,31 +72,27 @@ function EvaluatorDashboard() {
 
     const displayHash = (sub) => (sub.finalHash || '').substring(0, 12) + '...';
 
+    if (error && !exam) {
+        return (
+            <div style={{ textAlign: 'center', padding: '4rem' }}>
+                <p style={{ color: 'var(--error)', marginBottom: '1rem' }}>{error}</p>
+                <Link href="/evaluator" className="btn-secondary">Back to Dashboard</Link>
+            </div>
+        );
+    }
+
     return (
-        <div className="evaluator-dashboard">
-            <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '1rem' }}>Evaluator Dashboard</h1>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '3rem' }}>Review submissions blindly. You only see anonymous FINAL_HASH.</p>
+        <div className="grade-exam">
+            <div style={{ marginBottom: '1.5rem' }}>
+                <Link href="/evaluator" style={{ color: 'var(--primary)', textDecoration: 'none' }}>← Back to Evaluator Dashboard</Link>
+            </div>
+            <h1 style={{ fontSize: '2rem', fontWeight: '700', marginBottom: '0.5rem' }}>Grade Exam</h1>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+                {exam ? exam.title : examId} — Review submissions blindly. You only see anonymous FINAL_HASH.
+            </p>
 
             {error && (
                 <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '0.5rem', color: 'var(--error)' }}>{error}</div>
-            )}
-
-            {exams.length > 0 && (
-                <div style={{ marginBottom: '1.5rem' }}>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Exam</label>
-                    <select
-                        value={selectedExamId || ''}
-                        onChange={(e) => setSelectedExamId(e.target.value)}
-                        style={{ padding: '0.5rem', borderRadius: '0.5rem', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'white', minWidth: '200px' }}
-                    >
-                        {exams.map((ex) => (
-                            <option key={ex.examId} value={ex.examId}>{ex.title}</option>
-                        ))}
-                    </select>
-                    {selectedExamId && (
-                        <Link href={`/evaluator/exam/${selectedExamId}/grade`} style={{ marginLeft: '1rem', color: 'var(--primary)', fontWeight: 600 }}>Open grade page →</Link>
-                    )}
-                </div>
             )}
 
             {loading ? (
@@ -111,7 +104,6 @@ function EvaluatorDashboard() {
                             <thead>
                                 <tr style={{ borderBottom: '1px solid var(--border)', textAlign: 'left' }}>
                                     <th style={{ padding: '1rem' }}>FINAL_HASH (Anonymous)</th>
-                                    <th style={{ padding: '1rem' }}>Exam</th>
                                     <th style={{ padding: '1rem', textAlign: 'right' }}>Action</th>
                                 </tr>
                             </thead>
@@ -119,7 +111,6 @@ function EvaluatorDashboard() {
                                 {submissions.map((sub) => (
                                     <tr key={sub.submissionId} style={{ borderBottom: '1px solid var(--border)' }}>
                                         <td style={{ padding: '1rem' }}><code style={{ color: 'var(--primary)' }}>{displayHash(sub)}</code></td>
-                                        <td style={{ padding: '1rem' }}>{sub.exam?.title || selectedExamId}</td>
                                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                                             <button
                                                 onClick={() => setSelected(sub)}
@@ -171,4 +162,4 @@ function EvaluatorDashboard() {
     );
 }
 
-export default EvaluatorDashboard;
+export default GradeExam;
