@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace=frontend",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces",
     "test:yellow": "npm run test --workspace=packages/yellow-integration",
     "test:ens": "npm run test --workspace=packages/ens-integration",
