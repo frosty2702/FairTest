@@ -1,0 +1,13 @@
+/* Design system & app styles - load first */
+@import '../src/styles/index.css';
+@import '../src/styles/design-system.css';
+@import '../src/App.css';
+
+/* Layout */
+@import '../src/components/Layout/MainLayout.css';
+@import '../src/components/Layout/Sidebar.css';
+@import '../src/components/Layout/TopBar.css';
+
+#root, [data-nextjs-scroll-focus-boundary], main {
+  min-height: 100vh;
+}
