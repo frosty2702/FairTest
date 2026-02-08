@@ -90,9 +90,7 @@ export default class SuiStorageManager {
     }
 
     _requirePackageId() {
-        if (!this.packageId) {
-            throw new Error('SuiStorageManager: SUI_PACKAGE_ID is required. Set SUI_PACKAGE_ID environment variable or pass packageId in config.');
-        }
+        return !!this.packageId;
     }
 
     get client() {
@@ -153,7 +151,10 @@ export default class SuiStorageManager {
     }
 
     async storeExam(examData) {
-        this._requirePackageId();
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables to create exams on chain.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', examId: null, objectId: null, txDigest: null };
+        }
         const examIdStr = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
         const examIdBytes = Array.from(new TextEncoder().encode(examIdStr));
         const examTitle = examData.title || '';
@@ -250,8 +251,10 @@ export default class SuiStorageManager {
     }
 
     async registerForExam({ examId, studentWallet, examFee, creatorWallet }) {
-        this._requirePackageId();
-        
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            throw new Error('Blockchain not configured. Add SUI_PACKAGE_ID in Vercel → Settings → Environment Variables to register for exams.');
+        }
         console.log('[Sui] Registering for exam:', examId);
         console.log('[Sui] Student:', studentWallet);
         console.log('[Sui] Fee:', examFee, 'SUI');
@@ -385,7 +388,10 @@ export default class SuiStorageManager {
     }
 
     async storeSubmission(submissionData) {
-        this._requirePackageId();
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', submissionId: null, objectId: null, txDigest: null };
+        }
         const uidHash = typeof submissionData.finalHash === 'string'
             ? hexToBytes(submissionData.finalHash.startsWith('0x') ? submissionData.finalHash.slice(2) : submissionData.finalHash)
             : this._bytesArg(submissionData.finalHash);
@@ -578,8 +584,10 @@ export default class SuiStorageManager {
     }
 
     async storeResult(resultData) {
-        this._requirePackageId();
-        
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', resultId: null, objectId: null, txDigest: null };
+        }
         // Handle finalHash - it might be a string or need conversion
         let uidHash;
         if (typeof resultData.studentFinalHash === 'string') {

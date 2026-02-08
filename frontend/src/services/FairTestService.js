@@ -104,9 +104,10 @@ class FairTestService {
             ...examData,
             creatorWallet: this.currentWallet
         });
-        
+        if (!suiResult.success) {
+            throw new Error(suiResult.error || 'Failed to create exam. Add SUI_PACKAGE_ID in Vercel Environment Variables.');
+        }
         console.log('[FairTest] ✅ Exam created successfully!');
-        
         return {
             examId: suiResult.examId,
             suiObjectId: suiResult.objectId,
@@ -234,7 +235,9 @@ class FairTestService {
             answers, // Store answers for evaluator (in local storage)
             timeTaken
         });
-        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to submit. Add SUI_PACKAGE_ID in Vercel Environment Variables.');
+        }
         console.log('[FairTest] ✅ Submission recorded on blockchain!');
         console.log('[FairTest] Submission ID:', result.submissionId);
         console.log('[FairTest] Privacy: Wallet address NOT stored ✅');
@@ -321,7 +324,9 @@ class FairTestService {
             evaluatorFinalHash: evaluatorIdentity.finalHash, // Evaluator's FINAL_HASH
             ...evaluationData
         });
-        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to save evaluation. Add SUI_PACKAGE_ID in Vercel Environment Variables.');
+        }
         console.log('[FairTest] ✅ Evaluation recorded on blockchain!');
         console.log('[FairTest] Result ID:', result.resultId);
         console.log('[FairTest] Privacy: Student identity hidden ✅');
