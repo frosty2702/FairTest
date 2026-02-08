@@ -90,9 +90,7 @@ export default class SuiStorageManager {
     }
 
     _requirePackageId() {
-        if (!this.packageId) {
-            throw new Error('SuiStorageManager: SUI_PACKAGE_ID is required. Set SUI_PACKAGE_ID environment variable or pass packageId in config.');
-        }
+        return !!this.packageId;
     }
 
     get client() {
@@ -153,7 +151,10 @@ export default class SuiStorageManager {
     }
 
     async storeExam(examData) {
-        this._requirePackageId();
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables to create exams on chain.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', examId: null, objectId: null, txDigest: null };
+        }
         const examIdStr = `exam_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
         const examIdBytes = Array.from(new TextEncoder().encode(examIdStr));
         const examTitle = examData.title || '';
@@ -250,8 +251,10 @@ export default class SuiStorageManager {
     }
 
     async registerForExam({ examId, studentWallet, examFee, creatorWallet }) {
-        this._requirePackageId();
-        
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            throw new Error('Blockchain not configured. Add SUI_PACKAGE_ID in Vercel → Settings → Environment Variables to register for exams.');
+        }
         console.log('[Sui] Registering for exam:', examId);
         console.log('[Sui] Student:', studentWallet);
         console.log('[Sui] Fee:', examFee, 'SUI');
@@ -311,7 +314,10 @@ export default class SuiStorageManager {
         }
         
         // Fallback to blockchain (requires packageId)
-        this._requirePackageId();
+        if (!this.packageId) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – cannot load exam from chain');
+            return null;
+        }
         console.log('[Sui] Loading exam from blockchain:', examId);
         const obj = await this.client.getObject({
             id: examId,
@@ -382,7 +388,10 @@ export default class SuiStorageManager {
     }
 
     async storeSubmission(submissionData) {
-        this._requirePackageId();
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', submissionId: null, objectId: null, txDigest: null };
+        }
         const uidHash = typeof submissionData.finalHash === 'string'
             ? hexToBytes(submissionData.finalHash.startsWith('0x') ? submissionData.finalHash.slice(2) : submissionData.finalHash)
             : this._bytesArg(submissionData.finalHash);
@@ -481,7 +490,10 @@ export default class SuiStorageManager {
         }
         
         // Fallback to blockchain (requires packageId)
-        this._requirePackageId();
+        if (!this.packageId) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – cannot load submission from chain');
+            return null;
+        }
         const obj = await this.client.getObject({
             id: submissionId,
             options: { showContent: true }
@@ -572,8 +584,10 @@ export default class SuiStorageManager {
     }
 
     async storeResult(resultData) {
-        this._requirePackageId();
-        
+        if (!this._requirePackageId()) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – set it in Vercel Environment Variables.');
+            return { success: false, error: 'SUI_PACKAGE_ID not configured', resultId: null, objectId: null, txDigest: null };
+        }
         // Handle finalHash - it might be a string or need conversion
         let uidHash;
         if (typeof resultData.studentFinalHash === 'string') {
@@ -696,8 +710,9 @@ export default class SuiStorageManager {
     }
 
     async getResultBySubmission(submissionId) {
-        this._requirePackageId();
         const sub = await this.getSubmission(submissionId);
+        if (!sub) return null;
+        if (!this.packageId) return null;
         const resultIds = this.ensManager ? await this.ensManager.getResultIds(sub.examId) : [];
         for (const rid of resultIds) {
             const ro = await this.client.getObject({ id: rid, options: { showContent: true } });
@@ -750,7 +765,7 @@ export default class SuiStorageManager {
                         console.log('[Sui] Checking result:', data.submissionId, 'finalHash:', data.studentFinalHash);
                         
                         if (data.studentFinalHash === studentFinalHash) {
-                            // Get exam details
+                            // Get exam details (may be null if SUI_PACKAGE_ID not set)
                             const exam = await this.getExam(data.examId);
                             console.log('[Sui] Found matching result:', {
                                 submissionId: data.submissionId,
@@ -760,8 +775,8 @@ export default class SuiStorageManager {
                             });
                             results.push({
                                 ...data,
-                                examTitle: exam.title,
-                                examTotalMarks: exam.totalMarks
+                                examTitle: exam?.title ?? 'Unknown',
+                                examTotalMarks: exam?.totalMarks ?? 0
                             });
                         }
                     } catch (e) {
@@ -800,8 +815,8 @@ export default class SuiStorageManager {
                                 const exam = await this.getExam(data.examId);
                                 results.push({
                                     ...data,
-                                    examTitle: exam.title,
-                                    examTotalMarks: exam.totalMarks
+                                    examTitle: exam?.title ?? 'Unknown',
+                                    examTotalMarks: exam?.totalMarks ?? 0
                                 });
                             }
                         } catch (e) {}
@@ -815,7 +830,7 @@ export default class SuiStorageManager {
     }
 
     async verifyResult(resultId) {
-        this._requirePackageId();
+        if (!this.packageId) return { verified: false, error: 'SUI_PACKAGE_ID not configured' };
         const obj = await this.client.getObject({ id: resultId, options: { showContent: true } });
         if (obj.error || !obj.data) throw new Error(`Result ${resultId} not found`);
         const parsed = this._parseResultObject(obj.data, resultId);
@@ -830,7 +845,9 @@ export default class SuiStorageManager {
     }
 
     async getExamStats(examId) {
-        this._requirePackageId();
+        if (!this.packageId) {
+            return { totalSubmissions: 0, evaluated: 0, pending: 0, passed: 0, failed: 0, avgScore: 0 };
+        }
         const submissions = await this.getExamSubmissions(examId);
         const resultIds = this.ensManager ? await this.ensManager.getResultIds(examId) : [];
         const results = [];

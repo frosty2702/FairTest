@@ -36,6 +36,10 @@ function TakeExam({ examId }) {
         fairTestService.getExam(examId)
             .then((data) => {
                 if (cancelled) return;
+                if (!data) {
+                    setError('Exam not found. Set SUI_PACKAGE_ID in Vercel to load from chain.');
+                    return;
+                }
                 setExam({
                     id: data.examId,
                     name: data.title,

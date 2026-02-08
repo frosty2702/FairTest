@@ -19,6 +19,7 @@ function GradeExam({ examId }) {
         fairTestService.getExam(examId)
             .then((data) => {
                 if (cancelled) return;
+                if (!data) setError('Exam not found. Set SUI_PACKAGE_ID in Vercel to load from chain.');
                 setExam(data);
             })
             .catch((err) => { if (!cancelled) setError(err.message); });
