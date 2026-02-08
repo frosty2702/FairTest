@@ -182,6 +182,7 @@ class FairTestService {
         if (!this.currentWallet) throw new Error('Wallet not connected');
         
         const exam = await this.sui.getExam(examId);
+        if (!exam) throw new Error('Exam not found. Set SUI_PACKAGE_ID in Vercel to use chain.');
         
         // Register and pay exam fee on Sui
         console.log('[FairTest] Registering for exam on Sui...');
@@ -270,8 +271,8 @@ class FairTestService {
             const exam = await this.sui.getExam(result.examId);
             enrichedResults.push({
                 ...result,
-                examTitle: exam.title,
-                examTotalMarks: exam.totalMarks
+                examTitle: exam?.title ?? 'Unknown',
+                examTotalMarks: exam?.totalMarks ?? 0
             });
         }
         
@@ -309,6 +310,7 @@ class FairTestService {
         );
         
         const submission = await this.sui.getSubmission(submissionId);
+        if (!submission) throw new Error('Submission not found. Set SUI_PACKAGE_ID in Vercel to use chain.');
         
         // Store result on Sui blockchain with FINAL_HASH for both parties
         console.log('[FairTest] Storing evaluation on blockchain...');

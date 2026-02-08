@@ -311,7 +311,10 @@ export default class SuiStorageManager {
         }
         
         // Fallback to blockchain (requires packageId)
-        this._requirePackageId();
+        if (!this.packageId) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – cannot load exam from chain');
+            return null;
+        }
         console.log('[Sui] Loading exam from blockchain:', examId);
         const obj = await this.client.getObject({
             id: examId,
@@ -481,7 +484,10 @@ export default class SuiStorageManager {
         }
         
         // Fallback to blockchain (requires packageId)
-        this._requirePackageId();
+        if (!this.packageId) {
+            console.warn('[Sui] SUI_PACKAGE_ID not set – cannot load submission from chain');
+            return null;
+        }
         const obj = await this.client.getObject({
             id: submissionId,
             options: { showContent: true }
@@ -692,8 +698,9 @@ export default class SuiStorageManager {
     }
 
     async getResultBySubmission(submissionId) {
-        this._requirePackageId();
         const sub = await this.getSubmission(submissionId);
+        if (!sub) return null;
+        if (!this.packageId) return null;
         const resultIds = this.ensManager ? await this.ensManager.getResultIds(sub.examId) : [];
         for (const rid of resultIds) {
             const ro = await this.client.getObject({ id: rid, options: { showContent: true } });
@@ -746,12 +753,12 @@ export default class SuiStorageManager {
                         console.log('[Sui] Checking result:', data.submissionId, 'finalHash:', data.studentFinalHash);
                         
                         if (data.studentFinalHash === studentFinalHash) {
-                            // Get exam details
+                            // Get exam details (may be null if SUI_PACKAGE_ID not set)
                             const exam = await this.getExam(data.examId);
                             results.push({
                                 ...data,
-                                examTitle: exam.title,
-                                examTotalMarks: exam.totalMarks
+                                examTitle: exam?.title ?? 'Unknown',
+                                examTotalMarks: exam?.totalMarks ?? 0
                             });
                         }
                     } catch (e) {
@@ -790,8 +797,8 @@ export default class SuiStorageManager {
                                 const exam = await this.getExam(data.examId);
                                 results.push({
                                     ...data,
-                                    examTitle: exam.title,
-                                    examTotalMarks: exam.totalMarks
+                                    examTitle: exam?.title ?? 'Unknown',
+                                    examTotalMarks: exam?.totalMarks ?? 0
                                 });
                             }
                         } catch (e) {}
@@ -805,7 +812,7 @@ export default class SuiStorageManager {
     }
 
     async verifyResult(resultId) {
-        this._requirePackageId();
+        if (!this.packageId) return { verified: false, error: 'SUI_PACKAGE_ID not configured' };
         const obj = await this.client.getObject({ id: resultId, options: { showContent: true } });
         if (obj.error || !obj.data) throw new Error(`Result ${resultId} not found`);
         const parsed = this._parseResultObject(obj.data, resultId);
@@ -820,7 +827,9 @@ export default class SuiStorageManager {
     }
 
     async getExamStats(examId) {
-        this._requirePackageId();
+        if (!this.packageId) {
+            return { totalSubmissions: 0, evaluated: 0, pending: 0, passed: 0, failed: 0, avgScore: 0 };
+        }
         const submissions = await this.getExamSubmissions(examId);
         const resultIds = this.ensManager ? await this.ensManager.getResultIds(examId) : [];
         const results = [];
