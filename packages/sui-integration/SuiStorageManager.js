@@ -640,6 +640,8 @@ export default class SuiStorageManager {
             const percentage = resultData.maxScore ? (Number(resultData.score) / Number(resultData.maxScore)) * 100 : 0;
             const passed = percentage >= passPercentage;
             
+            console.log('[Sui] Storing result with questionScores:', resultData.questionScores);
+            
             const resultObj = {
                 resultId,
                 submissionId: resultData.submissionId,
@@ -659,6 +661,8 @@ export default class SuiStorageManager {
             localStorage.setItem(resultKey, JSON.stringify(resultObj));
             console.log('[Sui] ✅ Result stored in local storage:', resultKey);
             console.log('[Sui] Result data:', resultObj);
+            console.log('[Sui] Score details - score:', resultData.score, 'maxScore:', resultData.maxScore, 'percentage:', percentage);
+            console.log('[Sui] QuestionScores stored:', JSON.stringify(resultObj.questionScores, null, 2));
             
             // Update creator earnings
             const creatorEarnings = localStorage.getItem('fairtest_creator_earnings') || '{}';
@@ -763,6 +767,12 @@ export default class SuiStorageManager {
                         if (data.studentFinalHash === studentFinalHash) {
                             // Get exam details (may be null if SUI_PACKAGE_ID not set)
                             const exam = await this.getExam(data.examId);
+                            console.log('[Sui] Found matching result:', {
+                                submissionId: data.submissionId,
+                                score: data.score,
+                                maxScore: data.maxScore,
+                                percentage: data.percentage
+                            });
                             results.push({
                                 ...data,
                                 examTitle: exam?.title ?? 'Unknown',
